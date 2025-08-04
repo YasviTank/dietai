@@ -163,6 +163,13 @@
     mealTitle.textContent = `🍱 ${mealType} Meal${mealName ? " — " + mealName : ""}`;
     mealCard.appendChild(mealTitle);
 
+// Copy Button
+const copyBtn = document.createElement("button");
+copyBtn.className = "ml-auto text-sm text-blue-600 hover:underline mb-2";
+copyBtn.textContent = "📋 Copy";
+copyBtn.onclick = () => copyMealContent(mealCard);
+mealCard.appendChild(copyBtn);
+
     for (const key in contentMap) {
       const sectionContent = contentMap[key].trim();
       if (sectionContent) {
@@ -183,9 +190,30 @@
   });
 }
 
+function copyMealContent(mealCard) {
+  const text = mealCard.innerText;
+  navigator.clipboard.writeText(text)
+    .then(() => showToast("✅ Meal copied to clipboard!"))
+    .catch(err => console.error("Clipboard copy failed:", err));
+}
 
+function showToast(message) {
+  const toast = document.getElementById("copy-toast");
+  toast.textContent = message;
+  toast.classList.remove("hidden");
+
+  // Hide after 2 seconds
+  setTimeout(() => {
+    toast.classList.add("hidden");
+  }, 2000);
+}
 
 
   </script>
+  <!-- Copy Toast Notification -->
+<div id="copy-toast" class="fixed bottom-5 right-5 bg-green-100 text-green-800 px-4 py-2 rounded shadow hidden z-50">
+    ✅ Copied!
+  </div>
+  
 </body>
 </html>
