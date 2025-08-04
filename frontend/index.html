@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Diet AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans min-h-screen">
+  <div class="max-w-3xl mx-auto mt-10 p-6 bg-white rounded-xl shadow-md">
+    <h1 class="text-3xl font-bold mb-6 text-blue-700">🥗 Diet AI: Personalized Meal Plan</h1>
+
+    <!-- Form -->
+    <form id="recommendationForm" class="space-y-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input type="text" id="name" placeholder="Name" class="w-full border rounded p-2" required />
+        <input type="number" id="age" placeholder="Age" class="w-full border rounded p-2" required />
+        <input type="text" id="health_conditions" placeholder="Health Conditions (comma-separated)" class="w-full border rounded p-2" />
+        <input type="text" id="dietary_preferences" placeholder="Dietary Preferences (comma-separated)" class="w-full border rounded p-2" />
+        <input type="text" id="preferred_cuisines" placeholder="Preferred Cuisines (comma-separated)" class="w-full border rounded p-2" />
+        <input type="text" id="allergies" placeholder="Allergies (comma-separated)" class="w-full border rounded p-2" />
+        <input type="text" id="avoid_foods" placeholder="Foods to Avoid (comma-separated)" class="w-full border rounded p-2" />
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Select Meal Types:</label>
+        
+        <div class="flex flex-col space-y-2">
+          <label><input type="checkbox" name="mealTypes" value="Breakfast"> Breakfast</label>
+          <label><input type="checkbox" name="mealTypes" value="Lunch"> Lunch</label>
+          <label><input type="checkbox" name="mealTypes" value="Dinner"> Dinner</label>
+          <label><input type="checkbox" name="mealTypes" value="Snack"> Snack</label>
+        </div>
+      </div>
+      
+      <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+        🍽 Get Recommendation
+      </button>
+    </form>
+
+    <!-- Result -->
+    <div id="result" class="mt-8 hidden">
+      <h2 class="text-xl font-semibold text-green-600 mb-4">🌟 Your Personalized Meal Plan</h2>
+      <div id="formattedResult" class="space-y-4"></div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('recommendationForm');
+    const resultDiv = document.getElementById('result');
+    const formattedResult = document.getElementById('formattedResult');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const profile = {
+  name: document.getElementById('name').value,
+  age: parseInt(document.getElementById('age').value),
+  health_conditions: document.getElementById('health_conditions').value.split(',').map(s => s.trim()).filter(Boolean),
+  dietary_preferences: document.getElementById('dietary_preferences').value.split(',').map(s => s.trim()).filter(Boolean),
+  preferred_cuisines: document.getElementById('preferred_cuisines').value.split(',').map(s => s.trim()).filter(Boolean),
+  allergies: document.getElementById('allergies').value.split(',').map(s => s.trim()).filter(Boolean),
+  avoid_foods: document.getElementById('avoid_foods').value.split(',').map(s => s.trim()).filter(Boolean),
+  meal_types: Array.from(document.querySelectorAll('input[name="mealTypes"]:checked')).map(cb => cb.value)
+}
+
+      resultDiv.classList.remove("hidden");
+      formattedResult.innerHTML = `<div class="text-gray-600 text-sm">Loading...</div>`;
+
+      try {
+        const response = await fetch('http://127.0.0.1:8000/recommend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile)
+        });
+
+        const text = await response.text();
+        console.log("🔍 Gemini Response:", text);
+
+        displayFormattedResponse(text);
+      } catch (error) {
+        formattedResult.innerHTML = `<div class="text-red-600">❌ Error: ${error.message}</div>`;
+      }
+    });
+
+    function displayFormattedResponse(text) {
+  const sectionTitles = {
+    explanation: "📝 Explanation",
+    ingredients: "🍽 Ingredients",
+    instructions: "🧑‍🍳 Instructions",
+    nutrition: "🔍 Nutrition Highlights",
+    note: "💡 Notes",
+  };
+
+  const formattedResult = document.getElementById("formattedResult");
+  formattedResult.innerHTML = "";
+
+  const cleanedText = text
+    .replace(/\\n\\n/g, "\n\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\*\*/g, "")
+    .replace(/\r/g, "")
+    .trim();
+
+  const mealBlocks = cleanedText.split(/\n##\s*/g).filter(Boolean);
+
+  mealBlocks.forEach(block => {
+    const lines = block.trim().split('\n');
+    let mealTitleRaw = lines.shift() || "Meal";
+
+    const [mealTypePart, mealNamePart] = mealTitleRaw.split("—").map(s => s.trim());
+
+    let mealType = mealTypePart.replace(/[^a-zA-Z ]/g, "").replace("Meal", "").trim();
+    mealType = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+
+    const mealName = mealNamePart || "";
+
+    const contentMap = {
+      explanation: "",
+      ingredients: "",
+      instructions: "",
+      nutrition: "",
+      note: ""
+    };
+
+    let currentSection = null;
+    lines.forEach(line => {
+      const trimmed = line.trim();
+
+      if (/^Explanation:/i.test(trimmed)) {
+        currentSection = "explanation";
+        contentMap[currentSection] += trimmed.replace(/^Explanation:\s*/i, "") + "\n";
+      } else if (/^Ingredients:/i.test(trimmed)) {
+        currentSection = "ingredients";
+        contentMap[currentSection] += trimmed.replace(/^Ingredients:\s*/i, "") + "\n";
+      } else if (/^Instructions:/i.test(trimmed)) {
+        currentSection = "instructions";
+        contentMap[currentSection] += trimmed.replace(/^Instructions:\s*/i, "") + "\n";
+      } else if (/^Nutrition Highlights:/i.test(trimmed)) {
+        currentSection = "nutrition";
+        contentMap[currentSection] += trimmed.replace(/^Nutrition Highlights:\s*/i, "") + "\n";
+      } else if (/^Note:/i.test(trimmed)) {
+        currentSection = "note";
+        contentMap[currentSection] += trimmed.replace(/^Note:\s*/i, "") + "\n";
+      } else if (currentSection) {
+        contentMap[currentSection] += trimmed + "\n";
+      }
+    });
+
+    const mealCard = document.createElement("div");
+    mealCard.className = "bg-white border rounded-xl shadow-md mb-6 p-5";
+
+    const mealTitle = document.createElement("h2");
+    mealTitle.className = "text-2xl font-bold text-purple-700 mb-4";
+    mealTitle.textContent = `🍱 ${mealType} Meal${mealName ? " — " + mealName : ""}`;
+    mealCard.appendChild(mealTitle);
+
+    for (const key in contentMap) {
+      const sectionContent = contentMap[key].trim();
+      if (sectionContent) {
+        const sectionTitle = document.createElement("h3");
+        sectionTitle.className = "text-lg font-semibold text-blue-600 mt-4 mb-1";
+        sectionTitle.textContent = sectionTitles[key];
+
+        const sectionBody = document.createElement("pre");
+        sectionBody.className = "text-gray-700 whitespace-pre-wrap";
+        sectionBody.textContent = sectionContent;
+
+        mealCard.appendChild(sectionTitle);
+        mealCard.appendChild(sectionBody);
+      }
+    }
+
+    formattedResult.appendChild(mealCard);
+  });
+}
+
+
+
+
+  </script>
+</body>
+</html>
